@@ -27,6 +27,7 @@ import (
 	"sync"
 
 	"github.com/dnstap/golang-dnstap"
+	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
 type stringList []string
@@ -40,12 +41,20 @@ func (sl *stringList) String() string {
 }
 
 var (
-	flagTimeout    = flag.Duration("t", 0, "I/O timeout for tcp/ip and unix domain sockets")
+	flagTimeout = flag.Duration("t", 0, "I/O timeout for tcp/ip and unix domain sockets")
+
+	// file output flags
 	flagWriteFile  = flag.String("w", "", "write output to file")
 	flagAppendFile = flag.Bool("a", false, "append to the given file, do not overwrite. valid only when outputting a text or YAML file.")
 	flagQuietText  = flag.Bool("q", false, "use quiet text output")
 	flagYamlText   = flag.Bool("y", false, "use verbose YAML output")
 	flagJSONText   = flag.Bool("j", false, "use verbose JSON output")
+
+	// MQTT flags
+	flagMqttOutput      = flag.String("M", "", "write dnstap payloads to MQTT broker")
+	flagMqttTopicPrefix = flag.String("P", "", "MQTT topic prefix")
+	flagMqttQos         = flag.Int("Q", 0, "MQTT pub/sub qos")
+	flagMqttInput       = flag.String("m", "", "read dnstap payloads from MQTT broker")
 )
 
 func usage() {
@@ -72,13 +81,15 @@ var logger = log.New(os.Stderr, "", log.LstdFlags)
 
 func main() {
 	var tcpOutputs, unixOutputs stringList
-	var fileInputs, tcpInputs, unixInputs stringList
+	var fileInputs, tcpInputs, unixInputs, mqttTopics stringList
+	var mqttOutput, mqttInput string
 
 	flag.Var(&tcpOutputs, "T", "write dnstap payloads to tcp/ip address")
 	flag.Var(&unixOutputs, "U", "write dnstap payloads to unix socket")
 	flag.Var(&fileInputs, "r", "read dnstap payloads from file")
 	flag.Var(&tcpInputs, "l", "read dnstap payloads from tcp/ip")
 	flag.Var(&unixInputs, "u", "read dnstap payloads from unix socket")
+	flag.Var(&mqttTopics, "s", "subscribe to MQTT topics")
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	log.SetFlags(0)
@@ -110,7 +121,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "dnstap: Unix socket error: %v\n", err)
 		os.Exit(1)
 	}
-	if *flagWriteFile != "" || len(tcpOutputs)+len(unixOutputs) == 0 {
+	if err := addMqttOutput(output, mqttOutput); err != nil {
+		fmt.Fprintf(os.Stderr, "dnstap: MQTT output error: %v\n", err)
+		os.Exit(1)
+	}
+	if *flagWriteFile != "" || len(tcpOutputs)+len(unixOutputs) == 0 || mqttOutput != "" {
 		var format dnstap.TextFormatFunc
 
 		switch {
@@ -171,6 +186,18 @@ func main() {
 		iwg.Add(1)
 		go runInput(i, output, &iwg)
 	}
+	if mqttInput != "" {
+		opts := mqtt.NewClientOptions()
+		opts.AddBroker(mqttInput)
+		i, err := dnstap.NewMqttInput(opts, mqttTopics, byte(*flagMqttQos))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "dnstap: Failed to connect to broker %s: %v\n", mqttInput, err)
+			os.Exit(1)
+		}
+		i.SetLogger(logger)
+		iwg.Add(1)
+		go runInput(i, output, &iwg)
+	}
 	iwg.Wait()
 
 	output.Close()
@@ -207,5 +234,22 @@ func addSockOutputs(mo *mirrorOutput, network string, addrs stringList) error {
 		go o.RunOutputLoop()
 		mo.Add(o)
 	}
+	return nil
+}
+
+func addMqttOutput(mo *mirrorOutput, broker string) error {
+	if broker == "" {
+		return nil
+	}
+	opts := mqtt.NewClientOptions()
+	opts.AddBroker(broker)
+	o, err := dnstap.NewMqttOutput(opts, *flagMqttTopicPrefix, byte(*flagMqttQos))
+	if err != nil {
+		return err
+	}
+	o.SetLogger(logger)
+	go o.RunOutputLoop()
+	mo.Add(o)
+
 	return nil
 }
