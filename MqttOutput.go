@@ -26,6 +26,7 @@ func NewMqttOutput(opts *mqtt.ClientOptions, baseTopic string, qos byte) (o *Mqt
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		return nil, token.Error()
 	}
+	o.client = client
 	return
 }
 

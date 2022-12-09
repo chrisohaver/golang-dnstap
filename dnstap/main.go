@@ -82,7 +82,6 @@ var logger = log.New(os.Stderr, "", log.LstdFlags)
 func main() {
 	var tcpOutputs, unixOutputs stringList
 	var fileInputs, tcpInputs, unixInputs, mqttTopics stringList
-	var mqttOutput, mqttInput string
 
 	flag.Var(&tcpOutputs, "T", "write dnstap payloads to tcp/ip address")
 	flag.Var(&unixOutputs, "U", "write dnstap payloads to unix socket")
@@ -98,7 +97,7 @@ func main() {
 	// Handle command-line arguments.
 	flag.Parse()
 
-	if len(fileInputs)+len(unixInputs)+len(tcpInputs) == 0 {
+	if len(fileInputs)+len(unixInputs)+len(tcpInputs) == 0 && *flagMqttInput == "" {
 		fmt.Fprintf(os.Stderr, "dnstap: Error: no inputs specified.\n")
 		os.Exit(1)
 	}
@@ -121,11 +120,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "dnstap: Unix socket error: %v\n", err)
 		os.Exit(1)
 	}
-	if err := addMqttOutput(output, mqttOutput); err != nil {
+	if err := addMqttOutput(output, *flagMqttOutput); err != nil {
 		fmt.Fprintf(os.Stderr, "dnstap: MQTT output error: %v\n", err)
 		os.Exit(1)
 	}
-	if *flagWriteFile != "" || len(tcpOutputs)+len(unixOutputs) == 0 || mqttOutput != "" {
+	if *flagWriteFile != "" || len(tcpOutputs)+len(unixOutputs) == 0 || *flagMqttOutput != "" {
 		var format dnstap.TextFormatFunc
 
 		switch {
@@ -186,12 +185,12 @@ func main() {
 		iwg.Add(1)
 		go runInput(i, output, &iwg)
 	}
-	if mqttInput != "" {
+	if *flagMqttInput != "" {
 		opts := mqtt.NewClientOptions()
-		opts.AddBroker(mqttInput)
+		opts.AddBroker(*flagMqttInput)
 		i, err := dnstap.NewMqttInput(opts, mqttTopics, byte(*flagMqttQos))
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "dnstap: Failed to connect to broker %s: %v\n", mqttInput, err)
+			fmt.Fprintf(os.Stderr, "dnstap: Failed to connect to broker %s: %v\n", *flagMqttInput, err)
 			os.Exit(1)
 		}
 		i.SetLogger(logger)
