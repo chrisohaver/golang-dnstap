@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"runtime"
 	"strings"
@@ -186,8 +187,11 @@ func main() {
 		go runInput(i, output, &iwg)
 	}
 	if *flagMqttInput != "" {
-		opts := mqtt.NewClientOptions()
-		opts.AddBroker(*flagMqttInput)
+		opts, err := uriToMqttClientOpts(*flagMqttInput)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err)
+			os.Exit(1)
+		}
 		i, err := dnstap.NewMqttInput(opts, mqttTopics, byte(*flagMqttQos))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "dnstap: Failed to connect to broker %s: %v\n", *flagMqttInput, err)
@@ -200,6 +204,18 @@ func main() {
 	iwg.Wait()
 
 	output.Close()
+}
+
+func uriToMqttClientOpts(uri string) (*mqtt.ClientOptions, error) {
+	opts := mqtt.NewClientOptions()
+	u, err := url.Parse(uri)
+	if err != nil {
+		return nil, fmt.Errorf("dnstap: Invalid MQTT URI %s: %v\n", uri, err)
+	}
+	opts.Username = u.User.Username()
+	opts.Password, _ = u.User.Password()
+	opts.AddBroker(u.Host)
+	return opts, nil
 }
 
 func runInput(i dnstap.Input, o dnstap.Output, wg *sync.WaitGroup) {
@@ -240,8 +256,10 @@ func addMqttOutput(mo *mirrorOutput, broker string) error {
 	if broker == "" {
 		return nil
 	}
-	opts := mqtt.NewClientOptions()
-	opts.AddBroker(broker)
+	opts, err := uriToMqttClientOpts(broker)
+	if err != nil {
+		return err
+	}
 	o, err := dnstap.NewMqttOutput(opts, *flagMqttTopicPrefix, byte(*flagMqttQos))
 	if err != nil {
 		return err
