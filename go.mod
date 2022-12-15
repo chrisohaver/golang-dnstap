@@ -1,4 +1,4 @@
-module github.com/dnstap/golang-dnstap
+module github.com/chrisohaver/golang-dnstap
 
 go 1.19
 
