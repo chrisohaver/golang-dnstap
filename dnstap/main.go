@@ -125,7 +125,7 @@ func main() {
 		fmt.Fprintf(os.Stderr, "dnstap: MQTT output error: %v\n", err)
 		os.Exit(1)
 	}
-	if *flagWriteFile != "" || len(tcpOutputs)+len(unixOutputs) == 0 || *flagMqttOutput != "" {
+	if *flagWriteFile != "" || (len(tcpOutputs)+len(unixOutputs) == 0 && *flagMqttOutput == "") {
 		var format dnstap.TextFormatFunc
 
 		switch {
@@ -192,6 +192,7 @@ func main() {
 			fmt.Fprint(os.Stderr, err)
 			os.Exit(1)
 		}
+		opts.AutoReconnect = true
 		i, err := dnstap.NewMqttInput(opts, mqttTopics, byte(*flagMqttQos))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "dnstap: Failed to connect to broker %s: %v\n", *flagMqttInput, err)
@@ -260,6 +261,7 @@ func addMqttOutput(mo *mirrorOutput, broker string) error {
 	if err != nil {
 		return err
 	}
+	opts.AutoReconnect = true
 	o, err := dnstap.NewMqttOutput(opts, *flagMqttTopicPrefix, byte(*flagMqttQos))
 	if err != nil {
 		return err
