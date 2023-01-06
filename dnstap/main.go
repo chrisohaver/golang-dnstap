@@ -27,7 +27,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dnstap/golang-dnstap"
+	mqttdnstap "github.com/chrisohaver/golang-dnstap"
+	dnstap "github.com/dnstap/golang-dnstap"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -193,7 +194,7 @@ func main() {
 			os.Exit(1)
 		}
 		opts.AutoReconnect = true
-		i, err := dnstap.NewMqttInput(opts, mqttTopics, byte(*flagMqttQos))
+		i, err := mqttdnstap.NewMqttInput(opts, mqttTopics, byte(*flagMqttQos))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "dnstap: Failed to connect to broker %s: %v\n", *flagMqttInput, err)
 			os.Exit(1)
@@ -262,7 +263,7 @@ func addMqttOutput(mo *mirrorOutput, broker string) error {
 		return err
 	}
 	opts.AutoReconnect = true
-	o, err := dnstap.NewMqttOutput(opts, *flagMqttTopicPrefix, byte(*flagMqttQos))
+	o, err := mqttdnstap.NewMqttOutput(opts, *flagMqttTopicPrefix, byte(*flagMqttQos))
 	if err != nil {
 		return err
 	}

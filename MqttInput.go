@@ -1,6 +1,7 @@
 package dnstap
 
 import (
+	dnstap "github.com/dnstap/golang-dnstap"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
@@ -10,9 +11,13 @@ type MqttInput struct {
 	topics []string
 	qos    byte
 	wait   chan bool
-	reader Reader
-	log    Logger
+	reader dnstap.Reader
+	log    dnstap.Logger
 }
+
+type nullLogger struct{}
+
+func (n nullLogger) Printf(format string, v ...interface{}) {}
 
 // NewMqttInput creates a MqttInput subscribing to topics from the given broker.
 func NewMqttInput(opts *mqtt.ClientOptions, topics []string, qos byte) (input *MqttInput, err error) {
@@ -33,7 +38,7 @@ func NewMqttInput(opts *mqtt.ClientOptions, topics []string, qos byte) (input *M
 }
 
 // SetLogger configures a logger for FrameStreamInput read error reporting.
-func (input *MqttInput) SetLogger(logger Logger) {
+func (input *MqttInput) SetLogger(logger dnstap.Logger) {
 	input.log = logger
 }
 

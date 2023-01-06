@@ -29,7 +29,6 @@ import (
 // Output channel buffer size value from main dnstap package.
 const outputChannelSize = 32
 
-//
 // A fileOutput implements a dnstap.Output which writes frames to a file
 // and closes and reopens the file on SIGHUP.
 //
@@ -37,7 +36,6 @@ const outputChannelSize = 32
 // function (dnstp.TextFormatFunc) is given or the filename is blank or "-".
 // In the latter case, data is written in compact (quiet) text format unless
 // an alternate text format is given on the assumption that stdout is a terminal.
-//
 type fileOutput struct {
 	formatter dnstap.TextFormatFunc
 	filename  string
